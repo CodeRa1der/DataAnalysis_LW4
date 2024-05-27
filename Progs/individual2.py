@@ -3,13 +3,13 @@
 
 import argparse
 import json
+import sys
 import os.path
 from dotenv import load_dotenv
 
 
 # Необходимо добавить в данную работу
-# библиотеку dotenv и сделать так, чтобы программа
-# находила и считывала соответствующие данные с переменных окружения
+# библиотеку dotenv
 
 
 load_dotenv()
@@ -23,6 +23,7 @@ def add_route(routes, first, second):
             'second': second,
         }
     )
+    return routes
 
 
 def export_to_json(file, routes_list):
@@ -66,22 +67,14 @@ def list_of_routes(roadway):
         print("Список маршрутов пуст")
 
 
-def help():
-    print('\nСписок команд:')
-    print('help - Вывести этот список')
-    print('add - Добавить маршрут')
-    print('list - Показать список маршрутов')
-    print('exit - Выйти из программы')
-    print('export - Экспортировать данные в JSON-файл')
-    print('import (имя файла) - Импортировать данные')
-
-
 def main(command_line=None):
     # Родительский парсер для определения имени файла.
     file_parser = argparse.ArgumentParser(add_help=False)
     file_parser.add_argument(
-        "filename",
+        "-f"
+        "--filename",
         action="store",
+        required=False,
         help="Имя файла с данными"
     )
 
@@ -113,30 +106,40 @@ def main(command_line=None):
         help="Место прибытия"
     )
 
-    # Субпарсер для отображения всех маршрутов.
-    display_parser = subparsers.add_parser(
+    list_parser = subparsers.add_parser(
         "list",
         parents=[file_parser],
-        help="Показать список маршрутов"
+        help="Показать данные из JSON-файла"
     )
 
     # Разбор аргументов командной строки.
     args = parser.parse_args(command_line)
 
-    # Список маршрутов
-    routes = []
+    # Найти файл по переменной окружения
+    data_file = args.f__filename
+    if not data_file:
+        data_file = os.environ.get("ROUTES_FILE")
+    if not data_file:
+        print("Файл отсутствует", file=sys.stderr)
+        sys.exit(1)
 
-    filename = os.getenv('ROUTES_FILE', args.filename)
-
-    # Загрузить маршруты из файла, если файл существует.
-    if os.path.exists(args.filename):
-        routes = import_json(args.filename)
+    # Загрузить маршруты, если файл существует
+    fill = False
+    if os.path.exists(data_file):
+        routes = import_json(data_file)
+    else:
+        routes = []
 
     # Добавить маршрут.
     if args.command == "add":
         add_route(routes, args.first, args.second)
-        if filename:
-            export_to_json(filename, routes)
+        fill = True
+
+    if args.command == "list":
+        import_json(data_file)
+
+    if fill:
+        export_to_json(data_file, routes)
 
     # Показать список маршрутов.
     elif args.command == "list":
